@@ -1,0 +1,48 @@
+
+DeployByCreds:
+     [echo] Running task: SprintDeployTestRun
+     [echo] useSessionId is NOT set
+[sf:deploy] Request for a deploy submitted successfully.
+[sf:deploy] Request ID for the current deploy task: 0AfM000000Sjn1tKAB
+[sf:deploy] Waiting for server to finish processing the request...
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Pending
+[sf:deploy] Request Status: Failed

@@ -1,0 +1,394 @@
+<!--
+
+    Table of Contents:
+
+        SECTION 1: PROPERTIES
+        SECTION 2: SPRINT METHODS
+        SECTION 3: RETRIEVE METHODS
+        SECTION 4: DEPLOY METHODS
+        SECTION 5: DIFF METHODS
+        SECTION 6: TEST METHODS
+ -->
+
+<project name="SalesforceBaseDeployTasks" default="test" basedir="." xmlns:sf="antlib:com.salesforce">
+
+
+    <!-- ****************** SECTION 1: PROPERTIES ******************** -->
+
+        <!-- grab the properties and log the results -->
+        <property file="build.properties"/>
+        <record name="build.log"/>
+        <property environment="env"/>
+
+        <!--  Setup Properties for source and target paths  -->
+        <property name="SourceOrgPathBase" value="${basedir}/Source-${sf.source.orgName}/${sf.source.orgName}_Sprint_${sprintNumber}_${deployVersion}"/>
+        <property name="TargetOrgPathBase" value="${basedir}/Target-${sf.target.orgName}/${sf.target.orgName}_Sprint_${sprintNumber}_${deployVersion}"/>
+        <property name="PackageXMLFileName" value="package_Sprint_${sprintNumber}_${deployVersion}.xml"/>
+        <property name="DeploymentsPathBase" value="${basedir}/Deployed"/>
+        <property name="PackageXMLFile" value="${basedir}/${PackageXMLFileName}"/>
+        <property name="RetrieveAllPackageFile" value="${basedir}/RetrieveAllPackage.xml"/>
+        <property name="GitTargetPath" value="${TargetOrgPathBase}_Deploy"/>
+        <property name="DestructiveChangeSourceFile" value="${basedir}/DestructiveChanges_${sf.source.orgName}_Sprint_${sprintNumber}_${deployVersion}.xml"/>
+        <property name="DestructiveChangeTargetFile" value="${basedir}/DestructiveChanges_${sf.target.orgName}_Sprint_${sprintNumber}_${deployVersion}.xml"/>
+        <property name="DestructiveChangeSourceDeploymentDir" value="${DeploymentsPathBase}/DestructiveChanges_${sf.source.orgName}"/>
+        <property name="DestructiveChangeTargetDeploymentDir" value="${DeploymentsPathBase}/DestructiveChanges_${sf.target.orgName}"/>
+        <property name="EmptyPackageXMLFile" value="${basedir}/EmptyPackageXML.xml"/>
+        <property name="DeploymentsCopyFromDir" value="${TargetOrgPathBase}_Deploy"/>
+        <property name="DisplayDiffMessage" value="true"/>
+
+        <!--  properties for file comparison  -->
+        <property name="CompareFile1" value="${PackageXMLFile}"/>
+        <property name="CompareFile2" value="${SourceOrgPathBase}_Retrieve/package.xml}"/>
+
+        <property name="deploymentIdFile" value="deploymentId.log"/>
+
+        <!-- Setting default value for username, password and session id properties to empty string
+             so unset values are treated as empty. Without this, ant expressions such as ${sf.username}
+             will be treated literally.
+        -->
+        <condition property="sf.username" value=""> <not> <isset property="sf.username"/> </not> </condition>
+        <condition property="sf.password" value=""> <not> <isset property="sf.password"/> </not> </condition>
+        <condition property="sf.sessionId" value=""> <not> <isset property="sf.sessionId"/> </not> </condition>
+
+        <taskdef resource="com/salesforce/antlib.xml" uri="antlib:com.salesforce">
+            <classpath>
+                <pathelement location="../ant-salesforce.jar" />
+            </classpath>
+        </taskdef>
+
+    <!-- ****************** SECTION 1: PROPERTIES ******************** -->
+
+
+    <!-- ****************** SECTION 2: SPRINT METHODS ******************** -->
+
+        <!-- grab components from the source org and test deployment to the target org -->
+        <target name="SprintRetrieveAndTestDeploy" description="Retrieve package.xml data based and test the deployment. Sends email on completion">
+            <antcall target="SprintRetrieve"/>
+            <antcall target="SprintDeployTestRun"/>
+            <!-- <antcall target="EmailResults"/> -->
+        </target>
+
+
+        <!-- Sprint Retrieve - retrieve components from the source org -->
+        <target name="SprintRetrieve" description="Retrieve Source data for the current Deployment">
+            <echo message="Retrieving from ${sf.source.orgName}"/>
+            <echo message="Copying Package file from ${PackageXMLFile}"/>
+            <mkdir dir="${SourceOrgPathBase}_Retrieve"/>
+            <mkdir dir="${TargetOrgPathBase}_Deploy"/>
+            <copy file="${PackageXMLFile}" tofile="${SourceOrgPathBase}_Retrieve/package.xml" overwrite="true"/>
+            <!--  Clear the retrieve dir>  -->
+            <delete includeemptydirs="true">
+            <fileset dir="${SourceOrgPathBase}_Retrieve">
+            <include name="**/*"/>
+            <exclude name="package.xml"/>
+            </fileset>
+            </delete>
+            <!--  Clear the deploy dir>  -->
+            <delete includeemptydirs="true">
+            <fileset dir="${TargetOrgPathBase}_Deploy">
+            <include name="**/*"/>
+            </fileset>
+            </delete>
+            <!-- retrieve data from the salesforce Source org  -->
+            <antcall target="RetrieveSource"/>
+            <copy todir="${TargetOrgPathBase}_Deploy">
+            <fileset dir="${SourceOrgPathBase}_Retrieve">
+            <include name="**/*"/>
+            </fileset>
+            </copy>
+        </target>
+
+        <!-- SprintDeployTestRun -->
+        <target name="SprintDeployTestRun" description="Run a test deployment for the data in the Target folder">
+            <echo message="Testing Deployment to ${sf.target.orgName}"/>
+
+            <antcall target="Deploy">
+                <param name="taskName" value="SprintDeployTestRun"/>
+                <param name="sessionId" value="${sf.target.sessionId}"/>
+                <param name="username" value="${sf.target.username}"/>
+                <param name="password" value="${sf.target.password}"/>
+                <param name="serverurl" value="${sf.target.serverurl}"/>
+                <param name="deployRoot" value="${TargetOrgPathBase}_Deploy"/>
+                <param name="checkOnly" value="true"/>
+                <param name="testLevel" value="${sf.testLevel}"/>
+                <param name="useSessionId" value="${sf.target.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+        <!-- actual deployment -->
+        <target name="SprintDeploy" description="Deploy Components to Target Org">
+            <echo message="Deploying to ${sf.target.orgName}"/>
+            <antcall target="Deploy">
+                <param name="taskName" value="SprintDeploy"/>
+                <param name="sessionId" value="${sf.target.sessionId}"/>
+                <param name="username" value="${sf.target.username}"/>
+                <param name="password" value="${sf.target.password}"/>
+                <param name="serverurl" value="${sf.target.serverurl}"/>
+                <param name="deployRoot" value="${TargetOrgPathBase}_Deploy"/>
+                <param name="checkOnly" value="false"/>
+                <param name="testLevel" value="${sf.testLevel}"/>
+                <param name="useSessionId" value="${sf.target.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+    <!-- ****************** SECTION 2: SPRINT METHODS ******************** -->
+
+    <!-- ****************** SECTION 3: RETRIEVE METHODS ******************** -->
+
+        <!-- Retrieve an unpackaged set of metadata from source org -->
+        <!-- removed from after password below: sessionId="${sf.source.sessionId}" -->
+        <target name="RetrieveFromSource">
+            <mkdir dir="RetrieveFromSource"/>
+            <echo message="Retrieving components from file ${PackageXMLFile}"/>
+            <!-- Retrieve the contents into another directory -->
+            <sf:retrieve username="${sf.source.username}" password="${sf.source.password}"  serverurl="${sf.source.serverurl}" maxPoll="${sf.source.maxPoll}" retrieveTarget="RetrieveFromSource" unpackaged="${PackageXMLFile}"/>
+        </target>
+
+        <!-- Retrieve an unpackaged set of metadata from target org -->
+        <!-- removed from after password below: sessionId="${sf.source.sessionId}" -->
+        <target name="RetrieveFromTarget">
+            <mkdir dir="RetrieveFromTarget"/>
+             <echo message="Retrieving components from file ${PackageXMLFile}"/>
+            <!-- Retrieve the contents into another directory -->
+            <sf:retrieve username="${sf.target.username}" password="${sf.target.password}"  serverurl="${sf.target.serverurl}" maxPoll="${sf.target.maxPoll}" retrieveTarget="RetrieveFromTarget" unpackaged="${PackageXMLFile}"/>
+        </target>
+
+        <target name="RetrieveAllSource" description="Retrieve all data from the Source org">
+            <!-- <antcall target="RetrieveAllNotifyUser"/> -->
+            <echo message="Retrieving from ${sf.source.orgName}"/>
+            <mkdir dir="${SourceOrgPathBase}_RetrieveAll"/>
+            <!--  Clear the retrieve dir>  -->
+            <delete includeemptydirs="true">
+            <fileset dir="${SourceOrgPathBase}_RetrieveAll">
+            <include name="**/*"/>
+            <exclude name="package.xml"/>
+            </fileset>
+            </delete>
+            <echo message="Copying ${RetrieveAllPackageFile} to ${SourceOrgPathBase}_RetrieveAll"/>
+            <copy file="${RetrieveAllPackageFile}" tofile="${SourceOrgPathBase}_RetrieveAll/package.xml" overwrite="true"/>
+            <echo message="Backing up ${sf.source.orgName}"/>
+            <antcall target="RetrieveSourceAll"/>
+        </target>
+
+        <target name="RetrieveSourceAll">
+            <antcall target="Retrieve">
+                <param name="taskName" value="RetrieveSourceAll"/>
+                <param name="sessionId" value="${sf.source.sessionId}"/>
+                <param name="username" value="${sf.source.username}"/>
+                <param name="password" value="${sf.source.password}"/>
+                <param name="serverurl" value="${sf.source.serverurl}"/>
+                <param name="retrieveTarget" value="${SourceOrgPathBase}_RetrieveAll"/>
+                <param name="unpackaged" value="${SourceOrgPathBase}_RetrieveAll/package.xml"/>
+                <param name="useSessionId" value="${sf.source.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+        <target name="RetrieveAllTarget" description="Retrieve all data from the Target org">
+            <!-- <antcall target="RetrieveAllNotifyUser"/> -->
+            <mkdir dir="${TargetOrgPathBase}_RetrieveAll"/>
+            <!--  Clear the retrieve dir>  -->
+            <delete includeemptydirs="true">
+            <fileset dir="${TargetOrgPathBase}_RetrieveAll">
+            <include name="**/*"/>
+            <exclude name="package.xml"/>
+            </fileset>
+            </delete>
+            <echo message="Copying ${RetrieveAllPackageFile} to ${TargetOrgPathBase}_RetrieveAll"/>
+            <copy file="${RetrieveAllPackageFile}" tofile="${TargetOrgPathBase}_RetrieveAll/package.xml" overwrite="true"/>
+            <echo message=" Backing up ${sf.target.orgName}"/>
+            <antcall target="RetrieveTargetAll"/>
+        </target>
+
+        <target name="RetrieveTargetAll">
+            <antcall target="Retrieve">
+                <param name="taskName" value="RetrieveTargetAll"/>
+                <param name="sessionId" value="${sf.target.sessionId}"/>
+                <param name="username" value="${sf.target.username}"/>
+                <param name="password" value="${sf.target.password}"/>
+                <param name="serverurl" value="${sf.target.serverurl}"/>
+                <param name="retrieveTarget" value="${TargetOrgPathBase}_RetrieveAll"/>
+                <param name="unpackaged" value="${TargetOrgPathBase}_RetrieveAll/package.xml"/>
+                <param name="useSessionId" value="${sf.target.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+        <!-- Retrieve Source -->
+        <target name="RetrieveSource">
+            <antcall target="Retrieve">
+                <param name="taskName" value="RetrieveSource"/>
+                <param name="sessionId" value="${sf.source.sessionId}"/>
+                <param name="username" value="${sf.source.username}"/>
+                <param name="password" value="${sf.source.password}"/>
+                <param name="serverurl" value="${sf.source.serverurl}"/>
+                <param name="retrieveTarget" value="${SourceOrgPathBase}_Retrieve"/>
+                <param name="unpackaged" value="${SourceOrgPathBase}_Retrieve/package.xml"/>
+                <param name="useSessionId" value="${sf.source.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+        <!-- Retrieve Target -->
+        <target name="RetrieveTarget">
+            <antcall target="Retrieve">
+                <param name="taskName" value="RetrieveTarget"/>
+                <param name="sessionId" value="${sf.target.sessionId}"/>
+                <param name="username" value="${sf.target.username}"/>
+                <param name="password" value="${sf.target.password}"/>
+                <param name="serverurl" value="${sf.target.serverurl}"/>
+                <param name="retrieveTarget" value="${TargetOrgPathBase}_Retrieve"/>
+                <param name="unpackaged" value="${TargetOrgPathBase}_Retrieve/package.xml"/>
+                <param name="useSessionId" value="${sf.target.sessionId.is.set}"/>
+            </antcall>
+        </target>
+
+        <!-- Retrieve -->
+        <target name="Retrieve">
+            <echo message="Running task: ${taskName}"/>
+            <echo message="sessionId set: ${sessionId}"/>
+            <echo message="username set: ${username}"/>
+            <echo message="serverurl set: ${serverurl}"/>
+            <echo message="retrieveTarget set: ${retrieveTarget}"/>
+            <echo message="unpackaged set: ${unpackaged}"/>
+            <antcall target="RetrieveByCreds"/>
+        </target>
+
+        <!-- Retreive by Creds -->
+        <target name="RetrieveByCreds" description="retrieve components from org">
+            <echo message="Running task: ${taskName}"/>
+            <echo message="sf.source.sessionId is NOT set. value: ${sf.source.sessionId}"/>
+            <echo message="useSessionId is NOT set. value: ${useSessionId}"/>
+            <echo message="username set: ${username}"/>
+            <echo message="serverurl set: ${serverurl}"/>
+            <echo message="retrieveTarget set: ${retrieveTarget}"/>
+            <echo message="unpackaged set: ${unpackaged}"/>
+            <sf:retrieve username="${username}" password="${password}" serverurl="${serverurl}" retrieveTarget="${retrieveTarget}" unpackaged="${unpackaged}"/>
+        </target>
+
+    <!-- ****************** SECTION 3: RETRIEVE METHODS ******************** -->
+
+
+
+    <!-- ****************** SECTION 4: DEPLOY METHODS ******************** -->
+
+        <!--  Generic Deploy call  -->
+        <target name="Deploy">
+            <echo message="Running task: ${taskName}"/>
+            <echo message="sessionId set: ${sessionId}"/>
+            <echo message="username set: ${username}"/>
+            <echo message="serverurl set: ${serverurl}"/>
+            <echo message="deployRoot set: ${deployRoot}"/>
+            <echo message="checkOnly set: ${checkOnly}"/>
+            <echo message="useSessionId set: ${useSessionId}"/>
+            <echo message="testLevel set: ${testLevel}"/>
+            <record name="${deploymentIdFile}" action="start"/>
+            <antcall target="DeployByCreds"/>
+            <record name="${deploymentIdFile}" action="stop"/>
+        </target>
+
+        <!-- Deploy Based on Credentials -->
+        <target name="DeployByCreds" description="Deploy based on username and password">
+            <echo message="Running task: ${taskName}"/>
+            <echo message="useSessionId is NOT set"/>
+            <sf:deploy username="${username}" password="${password}" serverurl="${serverurl}" deployRoot="${deployRoot}" checkOnly="${checkOnly}" testLevel="${testLevel}"/>
+        </target>
+
+    <!-- ****************** SECTION 4: DEPLOY METHODS ******************** -->
+
+
+
+    <!-- ****************** SECTION 5: DIFF METHODS ******************** -->
+
+        <target name="DiffSourceAndTarget" description="Retrieves both the Source and Target data with the current package.xml and launches DiffMerge with the results">
+            <!-- <antcall target="RetrieveAllNotifyUser"/> -->
+            <parallel>
+                <antcall target="RetrieveAllSource">
+                    <param name="DisplayDiffMessage" value="false"/>
+                </antcall>
+                <antcall target="RetrieveAllTarget">
+                    <param name="DisplayDiffMessage" value="false"/>
+                </antcall>
+            </parallel>
+            <antcall target="DiffOrgs"/>
+        </target>
+
+        <target name="DiffPackageComponents" description="Does a Diff of Components being migrated from Source to Target">
+            <parallel>
+                <antcall target="RetrieveFromSource">
+                    <param name="DisplayDiffMessage" value="false"/>
+                </antcall>
+                <antcall target="RetrieveFromTarget">
+                    <param name="DisplayDiffMessage" value="false"/>
+                </antcall>
+            </parallel>
+            <antcall target="DiffPackage"/>
+        </target>
+
+        <target name="DiffOrgs">
+            <!--  Spawn a new process to show the diffs  -->
+            <exec executable="${diffMergePath}" spawn="true">
+            <arg value="-caption=Comparison of ${sf.source.orgName} and ${sf.target.orgName} Orgs"/>
+            <arg value="-t1=${sf.source.orgName}"/>
+            <arg value="-t2=${sf.target.orgName}"/>
+            <arg value="${SourceOrgPathBase}_RetrieveAll"/>
+            <arg value="${TargetOrgPathBase}_RetrieveAll"/>
+            </exec>
+        </target>
+
+        <target name="DiffPackage">
+            <!--  Spawn a new process to show the diffs  -->
+            <exec executable="${diffMergePath}" spawn="true">
+            <arg value="-caption=Comparison of ${sf.source.orgName} and ${sf.target.orgName} Orgs"/>
+            <arg value="-t1=${sf.source.orgName}"/>
+            <arg value="-t2=${sf.target.orgName}"/>
+            <arg value="RetrieveFromSource"/>
+            <arg value="RetrieveFromTarget"/>
+            </exec>
+        </target>
+
+    <!-- ****************** SECTION 5: DIFF METHODS ******************** -->
+
+
+    <!-- ****************** SECTION 6: TEST METHODS ******************** -->
+        <!-- Run Tests in Target -->
+        <target name="RunAllTestsTarget" description="Run all tests on the Target org">
+            <mkdir dir="${TargetOrgPathBase}_RunTests"/>
+            <antcall target="CreateEmptyPackageFile"/>
+            <echo message="Copying empty package.xmlfile"/>
+            <copy file="${EmptyPackageXMLFile}" tofile="${TargetOrgPathBase}_RunTests/package.xml" overwrite="true"/>
+            <antcall target="Deploy">
+                <param name="taskName" value="RunAllTestsTarget"/>
+                <param name="sessionId" value="${sf.target.sessionId}"/>
+                <param name="username" value="${sf.target.username}"/>
+                <param name="password" value="${sf.target.password}"/>
+                <param name="serverurl" value="${sf.target.serverurl}"/>
+                <param name="deployRoot" value="${TargetOrgPathBase}_RunTests"/>
+                <param name="checkOnly" value="true"/>
+                <param name="testLevel" value="RunLocalTests"/>
+                <param name="useSessionId" value="${sf.target.sessionId.is.set}"/>
+            </antcall>
+            <delete dir="${TargetOrgPathBase}_RunTests"/>
+        </target>
+
+        <!-- needed to run tests -->
+        <target name="CreateEmptyPackageFile">
+            <echoxml file="${EmptyPackageXMLFile}" append="false">
+                <Package xmlns="http://soap.sforce.com/2006/04/metadata">
+                    <version>45.0</version>
+                </Package>
+            </echoxml>
+        </target>
+    <!-- ****************** SECTION 6: TEST METHODS ******************** -->
+
+    <!-- ****************** SECTION 7: LIST METADATA METHODS ********************* -->
+
+        <!-- sessionId="${sf.source.sessionId}" -->
+        <target name="ListSourceDashboards">
+          <sf:listMetadata
+            username="${sf.source.username}"
+            password="${sf.source.password}"
+            serverurl="${sf.source.serverurl}"
+            metadataType="Dashboard"
+            resultFilePath="listMetadata/list.log"/>
+        </target>
+
+<!-- END OF FILE -->
+</project>
