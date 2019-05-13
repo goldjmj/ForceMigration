@@ -22,15 +22,21 @@ This file must be in every build folder. It does not need any changes, but can b
 **sf.runTests** = This controls what level of tests are run. Ensure the level you want is uncommented. Tests are always run in prod.
 
 
-**sf.source.orgName** = <sourceOrgName>
-**sf.source.username** = <usernmae>
-**sf.source.password** = <PasswordWithSecurityToken>
+**sf.source.orgName** = sourceOrgName
+
+**sf.source.username** =<usernmae
+
+**sf.source.password** = PasswordWithSecurityToken
+
 **sf.source.serverurl** = https://test.salesforce.com/
 **sf.source.maxPoll** = 20
 
-**sf.target.orgName** = <targetOrgName>
-**sf.target.username** = <usernmae>
-**sf.target.password** = <PasswordWithSecurityToken>
+**sf.target.orgName** = targetOrgName
+
+**sf.target.username** = usernmae
+
+**sf.target.password** = PasswordWithSecurityToken
+
 **sf.target.serverurl** = https://test.salesforce.com/
 **sf.target.maxPoll** = 20
 
